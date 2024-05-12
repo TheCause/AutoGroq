@@ -1,121 +1,47 @@
 import streamlit as st 
 
 from agent_management import display_agents
-from ui_utils import get_api_key, display_api_key_input, display_discussion_and_whiteboard, display_download_button, display_user_input, display_rephrased_request, display_reset_and_upload_buttons, display_user_request_input, rephrase_prompt, get_agents_from_text, extract_code_from_response, get_workflow_from_agents
-
+from ui_utils import get_api_key, display_api_key_input, display_discussion_and_whiteboard, display_download_button, display_user_input, display_rephrased_request, display_reset_and_upload_buttons, display_user_request_input
 
 def main(): 
-    st.markdown("""
+    initialize_session_state()
+    setup_page_layout()
+    manage_api_key()
+    handle_model_selection()
+    render_main_interface()
+
+def initialize_session_state():
+    """ Initialize or reset important session state variables. """
+    if "discussion" not in st.session_state:
+        st.session_state.discussion = ""
+    if "whiteboard" not in st.session_state:
+        st.session_state.whiteboard = ""
+
+def setup_page_layout():
+    """ Apply custom CSS to the Streamlit page. """
+    st.markdown(load_css(), unsafe_allow_html=True)
+
+def load_css():
+    """ Returns the CSS for the Streamlit page as a string. """
+    return """
         <style>
         /* General styles */
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
-        }
-
-        /* Sidebar styles */
-        .sidebar .sidebar-content {
-            background-color: #ffffff !important;
-            padding: 20px !important;
-            border-radius: 5px !important;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
-        }
-
-        .sidebar .st-emotion-cache-k7vsyb h1 {
-            font-size: 12px !important;
-            font-weight: bold !important;
-            color: #007bff !important;
-        }
-
-        .sidebar h2 {
-            font-size: 16px !important;
-            color: #666666 !important;
-        }
-
-        .sidebar .stButton button {
-            display: block !important;
-            width: 100% !important;
-            padding: 10px !important;
-            background-color: #007bff !important;
-            color: #ffffff !important;
-            text-align: center !important;
-            text-decoration: none !important;
-            border-radius: 5px !important;
-            transition: background-color 0.3s !important;
-        }
-
-        .sidebar .stButton button:hover {
-            background-color: #0056b3 !important;
-        }
-
-        .sidebar a {
-            display: block !important;
-            color: #007bff !important;
-            text-decoration: none !important;
-        }
-
-        .sidebar a:hover {
-            text-decoration: underline !important;
-        }
-
-        /* Main content styles */
-        .main .stTextInput input {
-            width: 100% !important;
-            padding: 10px !important;
-            border: 1px solid #cccccc !important;
-            border-radius: 5px !important;
-        }
-
-        .main .stTextArea textarea {
-            width: 100% !important;
-            padding: 10px !important;
-            border: 1px solid #cccccc !important;
-            border-radius: 5px !important;
-            resize: none !important;
-        }
-
-        .main .stButton button {
-            padding: 10px 20px !important;
-            background-color: #dc3545 !important;
-            color: #ffffff !important;
-            border: none !important;
-            border-radius: 5px !important;
-            cursor: pointer !important;
-            transition: background-color 0.3s !important;
-        }
-
-        .main .stButton button:hover {
-            background-color: #c82333 !important;
-        }
-
-        .main h1 {
-            font-size: 32px !important;
-            font-weight: bold !important;
-            color: #007bff !important;
-        }
-
-        /* Model selection styles */
-        .main .stSelectbox select {
-            width: 100% !important;
-            padding: 10px !important;
-            border: 1px solid #cccccc !important;
-            border-radius: 5px !important;
-        }
-
-        /* Error message styles */
-        .main .stAlert {
-            color: #dc3545 !important;
-        }
+        body { font-family: Arial, sans-serif; background-color: #f0f0f0; }
+        .sidebar .sidebar-content { background-color: #ffffff; padding: 20px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); }
+        .sidebar .st-emotion-cache-k7vsyb h1, .sidebar h2 { font-size: 12px; font-weight: bold; color: #007bff; }
+        .sidebar .stButton button { width: 100%; padding: 10px; background-color: #007bff; color: white; border-radius: 5px; transition: background-color 0.3s; }
+        .sidebar .stButton button:hover { background-color: #0056b3; }
+        .main .stTextInput input, .main .stTextArea textarea { width: 100%; padding: 10px; border: 1px solid #cccccc; border-radius: 5px; }
+        .main .stButton button { background-color: #dc3545; color: white; border-radius: 5px; transition: background-color 0.3s; }
+        .main .stButton button:hover { background-color: #c82333; }
+        .main h1 { font-size: 32px; color: #007bff; }
+        .main .stSelectbox select { width: 100%; padding: 10px; border-radius: 5px; }
+        .main .stAlert { color: #dc3545; }
         </style>
-        """, unsafe_allow_html=True)
-    
-    model_token_limits = { 
-        'llama3-70b-8192': 8192, 
-        'llama3-8b-8192': 8192, 
-        'mixtral-8x7b-32768': 32768,
-        'gemma-7b-it': 8192 
-    } 
+    """
 
+def manage_api_key():
+    """ Manage API key input and validation. """
     api_key = get_api_key()
     if api_key is None:
         api_key = display_api_key_input()
@@ -123,54 +49,30 @@ def main():
             st.warning("Please enter your GROQ_API_KEY to use the app.")
             return
 
-    
-    col1, col2, col3 = st.columns([2, 5, 3]) 
-    with col3: 
-        selected_model = st.selectbox( 
-            'Select Model', 
-            options=list(model_token_limits.keys()), 
-            index=0, 
-            key='model_selection' 
-        ) 
-        st.session_state.model = selected_model 
-        st.session_state.max_tokens = model_token_limits[selected_model] 
-        temperature = st.slider(
-            "Set Temperature",
-            min_value=0.0,
-            max_value=1.0,
-            value=st.session_state.get('temperature', 0.3),  # Default value or the last set value
-            step=0.01,
-            key='temperature'
-        )
-        
-    st.title("AutoGroq") 
-        
-    # Ensure default values for session state are set     
-    if "discussion" not in st.session_state: 
-        st.session_state.discussion = ""
-    if "whiteboard" not in st.session_state: 
-        st.session_state.whiteboard = "" # Apply CSS classes to elements 
-    
-    with st.sidebar: 
-        st.markdown('<div class="sidebar">', unsafe_allow_html=True) 
-        st.markdown('</div>', unsafe_allow_html=True) 
+def handle_model_selection():
+    """ Handle model selection and configuration. """
+    model_token_limits = {
+        'llama3-70b-8192': 8192, 'llama3-8b-8192': 8192, 'mixtral-8x7b-32768': 32768, 'gemma-7b-it': 8192
+    }
+    col1, col2, col3 = st.columns([2, 5, 3])
+    with col3:
+        selected_model = st.selectbox('Select Model', options=list(model_token_limits.keys()), index=0, key='model_selection')
+        st.session_state.model = selected_model
+        st.session_state.max_tokens = model_token_limits[selected_model]
+        st.session_state.temperature = st.slider("Set Temperature", 0.0, 1.0, st.session_state.get('temperature', 0.3), 0.01, 'temperature')
 
-    display_agents() 
-    
-    with st.container(): 
-        st.markdown('<div class="main">', unsafe_allow_html=True) 
-        display_user_request_input() 
-        display_rephrased_request() 
-        st.markdown('<div class="discussion-whiteboard">', unsafe_allow_html=True) 
-        display_discussion_and_whiteboard() 
-        st.markdown('</div>', unsafe_allow_html=True) 
-        st.markdown('<div class="user-input">', unsafe_allow_html=True) 
-        display_user_input() 
-        st.markdown('</div>', unsafe_allow_html=True) 
-        display_reset_and_upload_buttons() 
-        st.markdown('</div>', unsafe_allow_html=True) 
+def render_main_interface():
+    """ Render the main interface of the application. """
+    st.title("AutoGroq")
+    with st.sidebar:
+        display_agents()
+    with st.container():
+        display_user_request_input()
+        display_rephrased_request()
+        display_discussion_and_whiteboard()
+        display_user_input()
+        display_reset_and_upload_buttons()
+    display_download_button()
 
-    display_download_button()        
-    
 if __name__ == "__main__": 
     main()
